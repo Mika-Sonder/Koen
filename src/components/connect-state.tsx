@@ -1,0 +1,4 @@
+import Link from "next/link";
+import { LockKeyhole } from "lucide-react";
+import { Button } from "@/components/ui/button";
+export function ConnectState({ configured, title = "Tu espacio personal te espera" }: { configured: boolean; title?: string }) { return <div className="mx-auto grid min-h-[55vh] max-w-lg place-items-center text-center"><div><span className="mx-auto grid size-14 place-items-center rounded-2xl bg-primary/10 text-primary"><LockKeyhole className="size-6"/></span><h1 className="mt-5 text-2xl font-bold">{title}</h1><p className="mt-2 text-sm leading-6 text-muted-foreground">{configured ? "Accede para consultar y actualizar tu colección personal." : "Conecta el proyecto Supabase Koen en .env.local para activar cuentas, listas y favoritos."}</p><Button asChild className="mt-6"><Link href="/acceso">{configured ? "Acceder a mi cuenta" : "Ver configuración"}</Link></Button></div></div>; }

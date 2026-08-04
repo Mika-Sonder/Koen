@@ -1,0 +1,1 @@
+export default function LoadingDetail() { return <div className="-mx-4 -mt-6 md:-mx-7"><div className="h-[540px] animate-pulse bg-muted"/><div className="mx-auto max-w-[1400px] p-10"><div className="h-7 w-40 animate-pulse rounded bg-muted"/><div className="mt-5 space-y-3">{[1,2,3,4].map(i => <div key={i} className="h-4 animate-pulse rounded bg-muted"/>)}</div></div></div>; }

@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 240 20% 98%;
+    --foreground: 240 10% 8%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 8%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 8%;
+    --primary: 258 90% 62%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 238 20% 94%;
+    --secondary-foreground: 240 10% 12%;
+    --muted: 240 15% 94%;
+    --muted-foreground: 240 5% 42%;
+    --accent: 246 75% 94%;
+    --accent-foreground: 258 72% 40%;
+    --destructive: 0 72% 52%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 12% 88%;
+    --input: 240 12% 88%;
+    --ring: 258 90% 62%;
+  }
+
+  .dark {
+    --background: 240 20% 5%;
+    --foreground: 240 15% 94%;
+    --card: 240 15% 8%;
+    --card-foreground: 240 15% 96%;
+    --popover: 240 15% 9%;
+    --popover-foreground: 240 15% 96%;
+    --primary: 258 92% 68%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 10% 13%;
+    --secondary-foreground: 240 15% 93%;
+    --muted: 240 10% 12%;
+    --muted-foreground: 240 7% 61%;
+    --accent: 251 35% 17%;
+    --accent-foreground: 250 90% 78%;
+    --destructive: 0 68% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 11% 16%;
+    --input: 240 11% 18%;
+    --ring: 258 92% 68%;
+  }
+
+  * { @apply border-border; }
+  html { scroll-behavior: smooth; }
+  body { @apply bg-background text-foreground antialiased; }
+  ::selection { @apply bg-primary/30 text-foreground; }
+}
+
+@layer components {
+  .glass { @apply border border-white/40 bg-white/70 shadow-card backdrop-blur-xl dark:border-white/[.07] dark:bg-white/[.045]; }
+  .card-hover { @apply transition duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-glow; }
+  .text-gradient { @apply bg-gradient-to-r from-violet-500 via-purple-500 to-blue-500 bg-clip-text text-transparent; }
+  .focus-ring { @apply outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2; }
+}
+
+.ambient-bg::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(124, 58, 237, .12), transparent 28%),
+    radial-gradient(circle at 85% 16%, rgba(37, 99, 235, .09), transparent 26%);
+}
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
