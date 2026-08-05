@@ -27,7 +27,7 @@ export default async function ExplorarPage({ searchParams }: Props) {
   let novelResult = null;
   try {
     if (type === "NOVEL") {
-      novelResult = await getNovelSeries({ page, query: searchParams.q, status: searchParams.estado });
+      novelResult = await getNovelSeries({ page, query: searchParams.q, status: searchParams.estado, genre: Number(searchParams.genero) || undefined, year: Number(searchParams.año) || undefined, format: searchParams.formato === "digital" || searchParams.formato === "print" || searchParams.formato === "audio" ? searchParams.formato : undefined, sort: searchParams.orden });
     } else {
       mediaResult = await browseMedia({ page, type, genre: searchParams.genero ? ANILIST_GENRE_MAP[searchParams.genero] ?? searchParams.genero : undefined, year: searchParams.año ? Number(searchParams.año) : undefined, season: searchParams.temporada, status: searchParams.estado, format: searchParams.formato, sort: searchParams.orden, search: searchParams.q });
     }

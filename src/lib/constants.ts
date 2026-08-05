@@ -10,11 +10,32 @@ export const LIST_STATUSES = [
   { value: "repeating", label: "Repitiendo" },
 ] as const;
 
-export const GENRES = ["Acción", "Aventura", "Comedia", "Drama", "Fantasía", "Misterio", "Romance", "Ciencia ficción", "Deportes", "Sobrenatural"];
+export const GENRES = [
+  "Acción",
+  "Aventura",
+  "Comedia",
+  "Drama",
+  "Ecchi",
+  "Fantasía",
+  "Terror",
+  "Mahō shōjo",
+  "Mecha",
+  "Música",
+  "Misterio",
+  "Psicológico",
+  "Romance",
+  "Ciencia ficción",
+  "Vida cotidiana",
+  "Deportes",
+  "Sobrenatural",
+  "Suspenso",
+] as const;
 
 export const ANILIST_GENRE_MAP: Record<string, string> = {
-  Acción: "Action", Aventura: "Adventure", Comedia: "Comedy", Drama: "Drama", Fantasía: "Fantasy",
-  Misterio: "Mystery", Romance: "Romance", "Ciencia ficción": "Sci-Fi", Deportes: "Sports", Sobrenatural: "Supernatural",
+  Acción: "Action", Aventura: "Adventure", Comedia: "Comedy", Drama: "Drama", Ecchi: "Ecchi", Fantasía: "Fantasy",
+  Terror: "Horror", "Mahō shōjo": "Mahou Shoujo", Mecha: "Mecha", Música: "Music", Misterio: "Mystery",
+  Psicológico: "Psychological", Romance: "Romance", "Ciencia ficción": "Sci-Fi", "Vida cotidiana": "Slice of Life",
+  Deportes: "Sports", Sobrenatural: "Supernatural", Suspenso: "Thriller",
 };
 
 const GENRE_ES: Record<string, string> = {

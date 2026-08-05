@@ -3,8 +3,26 @@ const ENDPOINT = "https://ranobedb.org/api/v0";
 
 async function get<T>(path: string, revalidate = 900): Promise<T> { const response = await fetch(`${ENDPOINT}${path}`, { headers: { Accept: "application/json" }, next: { revalidate } }); if (!response.ok) throw new Error(`RanobeDB respondió con ${response.status}`); return response.json() as Promise<T>; }
 
-export async function getNovelSeries({ page = 1, query = "", status = "", sort = "Start date desc" }: { page?: number; query?: string; status?: string; sort?: string } = {}) {
-  const params = new URLSearchParams({ page: String(page), limit: "24", sort }); if (query) params.set("q", query); if (status) params.set("pubStatus", status);
+export interface NovelSeriesFilters {
+  page?: number;
+  query?: string;
+  status?: string;
+  sort?: string;
+  genre?: number;
+  year?: number;
+  format?: "digital" | "print" | "audio";
+}
+
+export async function getNovelSeries({ page = 1, query = "", status = "", sort = "Start date desc", genre, year, format }: NovelSeriesFilters = {}) {
+  const params = new URLSearchParams({ page: String(page), limit: "24", sort });
+  if (query) params.set("q", query);
+  if (status) params.set("pubStatus", status);
+  if (genre) params.set("tagsInclude", String(genre));
+  if (year) {
+    params.set("minStartDate", `${year}-01-01`);
+    params.set("maxStartDate", `${year}-12-31`);
+  }
+  if (format) params.set("rf", format);
   return get<{ series: NovelSeriesItem[]; count: string; currentPage: number; totalPages: number }>(`/series?${params}`, 600);
 }
 
