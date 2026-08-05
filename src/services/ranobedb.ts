@@ -13,7 +13,7 @@ export interface NovelSeriesFilters {
   format?: "digital" | "print" | "audio";
 }
 
-export async function getNovelSeries({ page = 1, query = "", status = "", sort = "Start date desc", genre, year, format }: NovelSeriesFilters = {}) {
+export async function getNovelSeries({ page = 1, query = "", status = "", sort = "Relevance desc", genre, year, format }: NovelSeriesFilters = {}) {
   const params = new URLSearchParams({ page: String(page), limit: "24", sort });
   if (query) params.set("q", query);
   if (status) params.set("pubStatus", status);

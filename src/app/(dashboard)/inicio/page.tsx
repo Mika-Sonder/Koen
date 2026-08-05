@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MediaGrid } from "@/components/media-grid";
 import { SectionHeading } from "@/components/section-heading";
-import { getMediaCollection } from "@/services/anilist";
-import { mediaTitle } from "@/types/media";
+import { isSupabaseConfigured } from "@/lib/env";
+import { createClient } from "@/lib/supabase/server";
+import { getMediaCollection, getPersonalizedAnimeRecommendations } from "@/services/anilist";
+import { mediaTitle, type MediaItem } from "@/types/media";
 
 export const metadata: Metadata = { title: "Inicio" };
 
@@ -17,17 +19,38 @@ function secondsToText(seconds: number) {
   return days > 0 ? `${days} d ${hours} h` : `${hours} h`;
 }
 
+async function getRecommendationsForCurrentUser(): Promise<MediaItem[]> {
+  if (!isSupabaseConfigured) return [];
+
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from("user_lists")
+    .select("media_id")
+    .eq("user_id", user.id)
+    .eq("media_type", "ANIME")
+    .order("updated_at", { ascending: false })
+    .limit(20);
+
+  if (error || !data?.length) return [];
+  return getPersonalizedAnimeRecommendations(data.map(({ media_id }) => media_id), 10);
+}
+
 export default async function InicioPage() {
-  const [trendingResult, airingResult, popularResult, mangaResult] = await Promise.allSettled([
+  const [trendingResult, airingResult, popularResult, mangaResult, recommendationsResult] = await Promise.allSettled([
     getMediaCollection(["TRENDING_DESC"], "ANIME", 10),
     getMediaCollection(["POPULARITY_DESC"], "ANIME", 10, { status: "RELEASING" }),
     getMediaCollection(["SCORE_DESC"], "ANIME", 10),
     getMediaCollection(["TRENDING_DESC"], "MANGA", 10),
+    getRecommendationsForCurrentUser(),
   ]);
   const trending = trendingResult.status === "fulfilled" ? trendingResult.value.Page.media : [];
   const airing = airingResult.status === "fulfilled" ? airingResult.value.Page.media : [];
   const popular = popularResult.status === "fulfilled" ? popularResult.value.Page.media : [];
   const manga = mangaResult.status === "fulfilled" ? mangaResult.value.Page.media : [];
+  const recommendations = recommendationsResult.status === "fulfilled" ? recommendationsResult.value : [];
   const hero = trending[0];
 
   return <div className="mx-auto max-w-[1500px] space-y-12">
@@ -44,6 +67,7 @@ export default async function InicioPage() {
     </section> : <section className="rounded-3xl border bg-gradient-to-br from-violet-700 to-blue-800 p-10 text-white"><h1 className="text-4xl font-black">Tu universo, organizado.</h1><p className="mt-3 text-white/70">Registra lo que ves, descubre tu próxima historia y nunca pierdas el hilo.</p></section>}
 
     {airing.length > 0 && <section><SectionHeading title="En emisión" description="Próximos episodios de la temporada" href="/explorar?estado=RELEASING"/><div className="no-scrollbar flex gap-3 overflow-x-auto pb-2">{airing.filter((item) => item.nextAiringEpisode).slice(0, 7).map((item) => <Link key={item.id} href={`/media/${item.id}`} className="glass flex min-w-[230px] items-center gap-3 rounded-2xl p-3 transition hover:border-primary/30"><Image src={item.coverImage.large} alt="" width={48} height={64} className="h-16 w-12 rounded-xl object-cover"/><div className="min-w-0"><p className="truncate text-sm font-semibold">{mediaTitle(item)}</p><p className="mt-1 text-xs text-muted-foreground">Episodio {item.nextAiringEpisode?.episode}</p><p className="mt-1 flex items-center gap-1 text-xs font-semibold text-primary"><Clock3 className="size-3"/>En {secondsToText(item.nextAiringEpisode?.timeUntilAiring ?? 0)}</p></div></Link>)}</div></section>}
+    {recommendations.length > 0 && <section><SectionHeading title="Recomendación para ti" description="Basado en los animes que agregaste a tu lista"/><MediaGrid media={recommendations}/></section>}
     {trending.length > 0 && <section><SectionHeading title="Tendencias ahora" description="Lo que todos están viendo" href="/explorar?orden=TRENDING_DESC"/><MediaGrid media={trending} priority/></section>}
     {popular.length > 0 && <section><SectionHeading title="Mejor valorados" description="Historias imprescindibles según la comunidad" href="/explorar?orden=SCORE_DESC"/><MediaGrid media={popular}/></section>}
     {manga.length > 0 && <section><SectionHeading title="Manga en tendencia" description="Lecturas que están marcando el momento" href="/explorar?tipo=MANGA"/><MediaGrid media={manga}/></section>}

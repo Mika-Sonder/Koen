@@ -3,7 +3,7 @@ import type { MediaItem } from "@/types/media";
 const ENDPOINT = "https://graphql.anilist.co";
 
 const MEDIA_FIELDS = `
-  id idMal type format status
+  id idMal type format status isAdult
   title { romaji english native }
   coverImage { extraLarge large color }
   bannerImage description averageScore popularity trending episodes chapters volumes genres season seasonYear
@@ -11,6 +11,18 @@ const MEDIA_FIELDS = `
   nextAiringEpisode { episode timeUntilAiring airingAt }
   studios(isMain: true) { nodes { id name } }
 `;
+
+const RELATED_MEDIA_FIELDS = `
+  id type format status isAdult
+  title { romaji english native }
+  coverImage { extraLarge large color }
+  averageScore popularity episodes chapters volumes genres season seasonYear
+  startDate { year month day }
+`;
+
+const FRANCHISE_RELATIONS = new Set(["ADAPTATION", "PREQUEL", "SEQUEL", "PARENT", "SIDE_STORY", "SUMMARY", "ALTERNATIVE", "SPIN_OFF", "SOURCE", "COMPILATION", "CONTAINS"]);
+const MAX_FRANCHISE_MEDIA = 60;
+const MAX_FRANCHISE_DEPTH = 6;
 
 async function request<T>(query: string, variables: Record<string, unknown>, revalidate = 300): Promise<T> {
   const response = await fetch(ENDPOINT, {
@@ -80,6 +92,84 @@ export async function getMediaCollection(sort: string[], type: "ANIME" | "MANGA"
     Page(page: $page, perPage: $perPage) { pageInfo { currentPage hasNextPage lastPage total } media(type: $type, sort: $sort, isAdult: false, season: $season, seasonYear: $seasonYear, status: $status, genre: $genre, search: $search, format: $format) { ${MEDIA_FIELDS} } }
   }`;
   return request<MediaPage>(query, { page: 1, perPage, type, sort, ...extra });
+}
+
+interface RecommendationSource {
+  id: number;
+  genres: string[];
+  recommendations?: {
+    nodes: Array<{
+      rating?: number | null;
+      mediaRecommendation?: MediaItem | null;
+    }>;
+  };
+}
+
+/** Builds recommendations from the anime the current user already tracks. */
+export async function getPersonalizedAnimeRecommendations(animeIds: number[], limit = 10) {
+  const trackedIds = Array.from(new Set(animeIds.filter(Number.isInteger))).slice(0, 50);
+  if (trackedIds.length === 0 || limit <= 0) return [];
+
+  const query = `query ($ids: [Int]) {
+    Page(perPage: 50) {
+      media(id_in: $ids, type: ANIME, isAdult: false) {
+        id genres
+        recommendations(perPage: 15, sort: RATING_DESC) {
+          nodes { rating mediaRecommendation { ${MEDIA_FIELDS} } }
+        }
+      }
+    }
+  }`;
+  const data = await request<{ Page: { media: RecommendationSource[] } }>(query, { ids: trackedIds }, 1800);
+  const excluded = new Set(trackedIds);
+  const candidates = new Map<number, { media: MediaItem; score: number; sources: Set<number> }>();
+
+  for (const source of data.Page.media) {
+    for (const recommendation of source.recommendations?.nodes ?? []) {
+      const media = recommendation.mediaRecommendation;
+      if (!media || media.type !== "ANIME" || media.isAdult || excluded.has(media.id)) continue;
+      const candidate = candidates.get(media.id) ?? { media, score: 0, sources: new Set<number>() };
+      candidate.score += Math.max(0, recommendation.rating ?? 0) + 1;
+      candidate.sources.add(source.id);
+      candidates.set(media.id, candidate);
+    }
+  }
+
+  const recommendations = Array.from(candidates.values())
+    .sort((left, right) => {
+      const leftScore = left.score + left.sources.size * 25;
+      const rightScore = right.score + right.sources.size * 25;
+      return rightScore - leftScore
+        || (right.media.popularity ?? 0) - (left.media.popularity ?? 0)
+        || right.media.id - left.media.id;
+    })
+    .map(({ media }) => media);
+
+  if (recommendations.length >= limit) return recommendations.slice(0, limit);
+
+  // Niche titles can have few community recommendations. Fill the row with
+  // popular anime from the user's most frequent genre.
+  const genreCounts = new Map<string, number>();
+  for (const source of data.Page.media) {
+    for (const genre of source.genres) genreCounts.set(genre, (genreCounts.get(genre) ?? 0) + 1);
+  }
+  const favoriteGenre = Array.from(genreCounts.entries()).sort((left, right) => right[1] - left[1])[0]?.[0];
+  const fallback = await getMediaCollection(
+    ["POPULARITY_DESC"],
+    "ANIME",
+    Math.min(50, limit + excluded.size + recommendations.length),
+    favoriteGenre ? { genre: favoriteGenre } : {},
+  );
+  const seen = new Set([...excluded, ...recommendations.map((media) => media.id)]);
+  for (const media of fallback.Page.media) {
+    if (!seen.has(media.id)) {
+      recommendations.push(media);
+      seen.add(media.id);
+    }
+    if (recommendations.length === limit) break;
+  }
+
+  return recommendations.slice(0, limit);
 }
 
 export async function browseMedia(params: { page?: number; type?: "ANIME" | "MANGA"; search?: string; genre?: string; year?: number; season?: string; status?: string; format?: string; sort?: string }) {
@@ -160,7 +250,7 @@ async function getExactBrowsePageInfo(params: Parameters<typeof browseMedia>[0],
 export async function getMedia(id: number) {
   const query = `query ($id: Int) { Media(id: $id, isAdult: false) { ${MEDIA_FIELDS}
     trailer { id site thumbnail }
-    relations { nodes { ${MEDIA_FIELDS} } }
+    relations { edges { relationType(version: 2) node { ${RELATED_MEDIA_FIELDS} } } }
     recommendations(perPage: 8, sort: RATING_DESC) { nodes { mediaRecommendation { ${MEDIA_FIELDS} } } }
     characters(perPage: 8, sort: [ROLE, RELEVANCE, ID]) { nodes { id name { full } image { large } } }
     staff(perPage: 8, sort: [RELEVANCE, ID]) { nodes { id name { full } image { large } } }
@@ -168,6 +258,62 @@ export async function getMedia(id: number) {
   } }`;
   const data = await request<{ Media: MediaItem }>(query, { id }, 600);
   return data.Media;
+}
+
+interface RelatedMediaPage {
+  Page: {
+    media: Array<{
+      id: number;
+      relations?: { edges?: Array<{ relationType: string; node: MediaItem }> };
+    }>;
+  };
+}
+
+export async function getAnimeFranchise(media: MediaItem) {
+  if (media.type !== "ANIME") return [];
+
+  const discovered = new Map<number, MediaItem>([[media.id, media]]);
+  const expanded = new Set<number>([media.id]);
+  let frontier: number[] = [];
+
+  function collect(edges: Array<{ relationType: string; node: MediaItem }> = []) {
+    const next: number[] = [];
+    for (const edge of edges) {
+      const node = edge.node;
+      if (!FRANCHISE_RELATIONS.has(edge.relationType) || node.isAdult || discovered.size >= MAX_FRANCHISE_MEDIA) continue;
+      if (!discovered.has(node.id)) discovered.set(node.id, node);
+      if (!expanded.has(node.id)) next.push(node.id);
+    }
+    return next;
+  }
+
+  frontier = collect(media.relations?.edges);
+  const query = `query ($ids: [Int]) {
+    Page(perPage: 50) {
+      media(id_in: $ids, isAdult: false) {
+        id
+        relations { edges { relationType(version: 2) node { ${RELATED_MEDIA_FIELDS} } } }
+      }
+    }
+  }`;
+
+  for (let depth = 0; depth < MAX_FRANCHISE_DEPTH && frontier.length > 0 && discovered.size < MAX_FRANCHISE_MEDIA; depth += 1) {
+    const ids = Array.from(new Set(frontier.filter((id) => !expanded.has(id)))).slice(0, 50);
+    if (ids.length === 0) break;
+    ids.forEach((id) => expanded.add(id));
+    const data = await request<RelatedMediaPage>(query, { ids }, 1800);
+    frontier = data.Page.media.flatMap((item) => collect(item.relations?.edges));
+  }
+
+  const releaseDate = (item: MediaItem) => {
+    const year = item.startDate?.year ?? item.seasonYear;
+    if (!year) return Number.MAX_SAFE_INTEGER;
+    return year * 10_000 + (item.startDate?.month ?? 0) * 100 + (item.startDate?.day ?? 0);
+  };
+
+  return Array.from(discovered.values())
+    .filter((item) => item.id !== media.id && item.type === "ANIME")
+    .sort((left, right) => releaseDate(left) - releaseDate(right) || left.id - right.id);
 }
 
 export async function getMediaByIds(ids: number[]) {

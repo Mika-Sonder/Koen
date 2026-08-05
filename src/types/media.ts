@@ -25,6 +25,7 @@ export interface MediaItem {
   averageScore: number | null;
   popularity?: number;
   trending?: number;
+  isAdult?: boolean;
   episodes?: number | null;
   chapters?: number | null;
   volumes?: number | null;
@@ -35,7 +36,10 @@ export interface MediaItem {
   nextAiringEpisode?: { episode: number; timeUntilAiring: number; airingAt: number } | null;
   studios?: { nodes: Array<{ id: number; name: string }> };
   trailer?: { id: string; site: string; thumbnail: string } | null;
-  relations?: { nodes: MediaItem[] };
+  relations?: {
+    nodes?: MediaItem[];
+    edges?: Array<{ relationType: string; node: MediaItem }>;
+  };
   recommendations?: { nodes: Array<{ mediaRecommendation: MediaItem }> };
   characters?: { nodes: Array<{ id: number; name: { full: string }; image: { large: string } }> };
   staff?: { nodes: Array<{ id: number; name: { full: string }; image: { large: string } }> };
