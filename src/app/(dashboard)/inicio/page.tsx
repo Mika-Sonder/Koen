@@ -8,7 +8,9 @@ import { MediaGrid } from "@/components/media-grid";
 import { SectionHeading } from "@/components/section-heading";
 import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
+import { stripHtml } from "@/lib/utils";
 import { getMediaCollection, getPersonalizedAnimeRecommendations } from "@/services/anilist";
+import { translateToSpanish } from "@/services/translation";
 import { mediaTitle, type MediaItem } from "@/types/media";
 
 export const metadata: Metadata = { title: "Inicio" };
@@ -52,6 +54,9 @@ export default async function InicioPage() {
   const manga = mangaResult.status === "fulfilled" ? mangaResult.value.Page.media : [];
   const recommendations = recommendationsResult.status === "fulfilled" ? recommendationsResult.value : [];
   const hero = trending[0];
+  const heroDescription = hero
+    ? await translateToSpanish(stripHtml(hero.description) || "Sin sinopsis disponible.")
+    : null;
 
   return <div className="mx-auto max-w-[1500px] space-y-12">
     {hero ? <section className="relative min-h-[410px] overflow-hidden rounded-3xl border bg-card shadow-card md:min-h-[470px]">
@@ -60,7 +65,7 @@ export default async function InicioPage() {
       <div className="relative flex min-h-[410px] max-w-2xl flex-col justify-end p-6 text-white md:min-h-[470px] md:p-10">
         <Badge className="mb-4 w-fit border-violet-400/30 bg-violet-500/20 text-violet-100"><Sparkles className="mr-1.5 size-3"/>Tendencia de la semana</Badge>
         <h1 className="text-balance text-3xl font-black leading-tight tracking-[-.035em] md:text-5xl">{mediaTitle(hero)}</h1>
-        <p className="mt-4 line-clamp-3 max-w-xl text-sm leading-6 text-white/70 md:text-base">{hero.description?.replace(/<[^>]*>/g, "") ?? "Descubre una de las historias más comentadas de la temporada."}</p>
+        <p className="mt-4 line-clamp-3 max-w-xl text-sm leading-6 text-white/70 md:text-base">{heroDescription?.text ?? "Descubre una de las historias más comentadas de la temporada."}</p>
         <div className="mt-5 flex flex-wrap items-center gap-4 text-xs font-medium text-white/70">{hero.seasonYear && <span className="flex items-center gap-1.5"><CalendarDays className="size-4"/>{hero.seasonYear}</span>}<span>{hero.format}</span>{hero.episodes && <span>{hero.episodes} episodios</span>}<span>{hero.averageScore ? `${(hero.averageScore / 10).toFixed(1)} / 10` : "Sin puntuación"}</span></div>
         <div className="mt-7 flex gap-3"><Button asChild size="lg" className="bg-white text-black hover:bg-white/90"><Link href={`/media/${hero.id}`}><Play className="size-4 fill-current"/>Ver detalles</Link></Button><Button asChild size="lg" variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/20"><Link href="/explorar">Explorar catálogo<ArrowRight className="size-4"/></Link></Button></div>
       </div>
